@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.0
+- Terminal output is no longer cleared between runs. Set cppRunButton.clearTerminalBeforeRun to true for the old behavior.
+
 ## 0.2.1
 
 - New icon: "C++" in terminal green, where the second + is cut through a ▶ button.

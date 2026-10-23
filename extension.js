@@ -20,7 +20,7 @@ function activate(context) {
   return { cpptools };
 }
 
-function deactivate() {}
+function deactivate() { }
 
 // Counts clicks, so an older click that is still building can tell that a
 // newer one has taken over and must not start its program.
@@ -43,7 +43,7 @@ async function buildAndRun(uri) {
     return { built: false };
   }
   // Not awaited: the build goes ahead while the question is showing.
-  cpptools.offerToHideRunButton(extensionContext, document.uri).catch(() => {});
+  cpptools.offerToHideRunButton(extensionContext, document.uri).catch(() => { });
 
   const file = document.uri.fsPath;
   const dir = path.dirname(file);
@@ -51,6 +51,7 @@ async function buildAndRun(uri) {
   const exe = path.join(dir, process.platform === 'win32' ? `${name}.exe` : name);
 
   const config = vscode.workspace.getConfiguration('cppRunButton', document.uri);
+  const clearBeforeRun = config.get('clearTerminalBeforeRun', false);
   const compiler = findCompiler(config, document.uri);
   if (!compiler) {
     return { built: false };
@@ -75,7 +76,7 @@ async function buildAndRun(uri) {
     { type: TASK_TYPE, step: 'build', file },
     scope,
     new vscode.ProcessExecution(compiler, args, cwdOptions),
-    { clear: true, focus: false, echo: true }
+    { clear: clearBeforeRun, focus: false, echo: true }
   );
   if (!build.started) {
     vscode.window.showErrorMessage(`Couldn't start the compiler "${compiler}".`);
@@ -116,7 +117,7 @@ function findCompiler(config, uri) {
     if (findExecutable(chosen)) return chosen;
     vscode.window.showErrorMessage(
       `Couldn't find the compiler "${chosen}" set in "cppRunButton.compiler". ` +
-        'Check that it is installed, and use its full path if it is not on your PATH.'
+      'Check that it is installed, and use its full path if it is not on your PATH.'
     );
     return undefined;
   }
@@ -127,7 +128,7 @@ function findCompiler(config, uri) {
 
   vscode.window.showErrorMessage(
     'Couldn\'t find g++. Install it and make sure it is on your PATH, ' +
-      'or set "cppRunButton.compiler" to the full path of your compiler.'
+    'or set "cppRunButton.compiler" to the full path of your compiler.'
   );
   return undefined;
 }
