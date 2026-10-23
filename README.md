@@ -21,6 +21,8 @@ It works in VS Code and VSCodium, on Linux, macOS and Windows, and inside WSL.
 - **The program runs from the file's folder**, so relative paths like `std::ifstream("input.txt")` open files next
   to your source, even when you opened just the file and no folder.
 - **Click again to restart:** a program still waiting for input is stopped before the new build starts.
+- **Keep earlier output if you want:** each click clears the terminal by default; set
+  `cppRunButton.clearTerminal` to `false` to keep previous runs' output above the new one.
 - **No dependencies:** nothing to install besides a compiler, and no shell commands, so file names with spaces
   are fine.
 - **Gets along with Microsoft's C/C++ extension:** uses the compiler it is set up with, and offers to hide its
