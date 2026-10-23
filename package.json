@@ -2,7 +2,7 @@
   "name": "cpp-run-button",
   "displayName": "C++ Run Button",
   "description": "A ▶ button in the editor title bar that compiles the open C++ file with g++ and runs it.",
-  "version": "0.3.0",
+  "version": "0.2.1",
   "publisher": "xalrk",
   "icon": "images/icon.png",
   "license": "MIT",
@@ -102,10 +102,10 @@
           "default": [],
           "markdownDescription": "Extra arguments passed to the compiler before the file name, for example `[\"-std=c++20\", \"-Wall\"]`."
         },
-        "cppRunButton.clearTerminalBeforeRun": {
+        "cppRunButton.clearTerminal": {
           "type": "boolean",
-          "default": false,
-          "markdownDescription": "Clear the terminal before each build and run. When off, output from previous runs stays visible so you can scroll back through it."
+          "default": true,
+          "markdownDescription": "Clear the terminal on each click, so it shows only the latest build and run. Turn off to keep the output of earlier runs above it."
         }
       }
     }

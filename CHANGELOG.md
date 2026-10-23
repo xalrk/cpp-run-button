@@ -1,7 +1,9 @@
 # Changelog
 
-## 0.3.0
-- Terminal output is no longer cleared between runs. Set cppRunButton.clearTerminalBeforeRun to true for the old behavior.
+## Unreleased
+
+- `cppRunButton.clearTerminal` setting: set it to `false` to keep the output of earlier runs in the terminal
+  instead of clearing it on each click. Clearing stays the default.
 
 ## 0.2.1
 

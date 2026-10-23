@@ -137,6 +137,24 @@ const tests = {
     }
   },
 
+  async 'clears the terminal unless clearTerminal is off'() {
+    const cleared = [];
+    const subscription = vscode.tasks.onDidStartTask((e) => {
+      if (e.execution.task.definition.step === 'build') cleared.push(e.execution.task.presentationOptions.clear);
+    });
+    const config = vscode.workspace.getConfiguration('cppRunButton');
+    try {
+      await open(write('clear.cpp', 'int main() { return 0; }\n'));
+      await runButton();
+      await config.update('clearTerminal', false, vscode.ConfigurationTarget.Global);
+      await runButton();
+      assert.deepStrictEqual(cleared, [true, false]);
+    } finally {
+      subscription.dispose();
+      await config.update('clearTerminal', undefined, vscode.ConfigurationTarget.Global);
+    }
+  },
+
   async 'reports a compiler that cannot be started'() {
     const config = vscode.workspace.getConfiguration('cppRunButton');
     await config.update('compiler', 'no-such-compiler-xyz', vscode.ConfigurationTarget.Global);
