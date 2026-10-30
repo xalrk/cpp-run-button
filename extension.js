@@ -20,7 +20,7 @@ function activate(context) {
   return { cpptools };
 }
 
-function deactivate() {}
+function deactivate() { }
 
 // Counts clicks, so an older click that is still building can tell that a
 // newer one has taken over and must not start its program.
@@ -43,7 +43,7 @@ async function buildAndRun(uri) {
     return { built: false };
   }
   // Not awaited: the build goes ahead while the question is showing.
-  cpptools.offerToHideRunButton(extensionContext, document.uri).catch(() => {});
+  cpptools.offerToHideRunButton(extensionContext, document.uri).catch(() => { });
 
   const file = document.uri.fsPath;
   const dir = path.dirname(file);
@@ -55,7 +55,13 @@ async function buildAndRun(uri) {
   if (!compiler) {
     return { built: false };
   }
-  const args = [...config.get('compilerArgs', []), file, '-o', exe];
+  // Other .cpp files the program needs: the sources that go with the headers
+  // it includes, plus any the user listed.
+  const extra = config.get('extraSources', []).map((p) => path.resolve(dir, p));
+  const siblings = config.get('followIncludes', true) ? findSiblingSources(file) : [];
+  const sources = [...new Set([...siblings, ...extra])].filter((s) => s !== file);
+  await saveDirtySources(sources);
+  const args = [...config.get('compilerArgs', []), file, ...sources, '-o', exe];
   const scope = vscode.workspace.getWorkspaceFolder(document.uri) || vscode.TaskScope.Workspace;
 
   // A program still waiting for input would keep its terminal busy, and on
@@ -118,7 +124,7 @@ function findCompiler(config, uri) {
     if (findExecutable(chosen)) return chosen;
     vscode.window.showErrorMessage(
       `Couldn't find the compiler "${chosen}" set in "cppRunButton.compiler". ` +
-        'Check that it is installed, and use its full path if it is not on your PATH.'
+      'Check that it is installed, and use its full path if it is not on your PATH.'
     );
     return undefined;
   }
@@ -129,9 +135,57 @@ function findCompiler(config, uri) {
 
   vscode.window.showErrorMessage(
     'Couldn\'t find g++. Install it and make sure it is on your PATH, ' +
-      'or set "cppRunButton.compiler" to the full path of your compiler.'
+    'or set "cppRunButton.compiler" to the full path of your compiler.'
   );
   return undefined;
+}
+
+// The .cpp files that go with the headers a source file includes. For each
+// #include "foo.h" (looked up from the including file's folder), a sibling
+// foo.cpp, foo.cc or foo.cxx is added to the build, and the search continues
+// through that file's includes, so main -> a.h -> b.h is followed all the way.
+// A header with no matching source adds nothing.
+function findSiblingSources(file) {
+  const seen = new Set([file]);
+  const sources = [];
+  const queue = [file];
+  while (queue.length) {
+    const current = queue.pop();
+    let text;
+    try {
+      text = fs.readFileSync(current, 'utf8');
+    } catch {
+      continue;
+    }
+    for (const match of text.matchAll(/^\s*#\s*include\s*"([^"]+)"/gm)) {
+      const header = path.resolve(path.dirname(current), match[1]);
+      const base = header.replace(/\.(h|hpp|hh|hxx)$/i, '');
+      for (const ext of ['.cpp', '.cc', '.cxx']) {
+        const source = base + ext;
+        if (!seen.has(source) && fs.existsSync(source)) {
+          seen.add(source);
+          sources.push(source);
+          queue.push(source);
+        }
+      }
+      if (!seen.has(header) && fs.existsSync(header)) {
+        seen.add(header);
+        queue.push(header); // headers can include other headers
+      }
+    }
+  }
+  return sources;
+}
+
+// Saves unsaved edits in the extra files about to be compiled, so the build
+// doesn't use stale copies. Only those files, not everything that's open.
+async function saveDirtySources(sources) {
+  const wanted = new Set(sources.map((s) => path.normalize(s)));
+  for (const doc of vscode.workspace.textDocuments) {
+    if (doc.isDirty && wanted.has(path.normalize(doc.uri.fsPath))) {
+      await doc.save();
+    }
+  }
 }
 
 async function findDocument(uri) {

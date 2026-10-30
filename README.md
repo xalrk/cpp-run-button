@@ -21,6 +21,8 @@ It works in VS Code and VSCodium, on Linux, macOS and Windows, and inside WSL.
 - **The program runs from the file's folder**, so relative paths like `std::ifstream("input.txt")` open files next
   to your source, even when you opened just the file and no folder.
 - **Click again to restart:** a program still waiting for input is stopped before the new build starts.
+- **Multi-file programs:** the `.cpp` file that goes with each header you include (`util.h` → `util.cpp`) is
+  compiled and linked automatically.
 - **Keep earlier output if you want:** each click clears the terminal by default; set
   `cppRunButton.clearTerminal` to `false` to keep previous runs' output above the new one.
 - **No dependencies:** nothing to install besides a compiler, and no shell commands, so file names with spaces
@@ -128,8 +130,13 @@ may want to add these to your `.gitignore`.
 | `cppRunButton.compiler` | `""` | Compiler to run: a name on your `PATH` (`g++`, `clang++`) or a full path, e.g. `C:\msys64\ucrt64\bin\g++.exe`. When empty, `g++` from your `PATH` is used, or else the compiler set up in Microsoft's C/C++ extension. |
 | `cppRunButton.compilerArgs` | `[]` | Extra arguments placed before the file name, e.g. `["-std=c++20", "-Wall", "-O2"]`. |
 | `cppRunButton.clearTerminal` | `true` | Clear the terminal on each click, so it shows only the latest build and run. Set to `false` to keep the output of earlier runs above it. |
+| `cppRunButton.followIncludes` | `true` | Also compile the `.cpp` file next to each `#include "x.h"` header (`x.cpp`, `x.cc` or `x.cxx`), following includes through those files too. |
+| `cppRunButton.extraSources` | `[]` | Extra source files to compile with the open file, as full paths or paths relative to its folder, e.g. `["helpers.cpp", "../shared/math.cpp"]`. |
 
-Each file is compiled on its own. For projects with several `.cpp` files, use a build system such as CMake.
+The open file is compiled together with the `.cpp` files that go with the headers it includes: `#include "util.h"`
+adds `util.cpp` from the same folder, and so on through the headers those files include. Sources that don't follow
+that naming, or live elsewhere, can be listed in `cppRunButton.extraSources`. For larger projects, use a build
+system such as CMake.
 
 ## Microsoft's C/C++ extension
 
