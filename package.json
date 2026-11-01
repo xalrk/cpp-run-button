@@ -106,6 +106,19 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Clear the terminal on each click, so it shows only the latest build and run. Turn off to keep the output of earlier runs above it."
+        },
+        "cppRunButton.followIncludes": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Also compile the `.cpp` file that goes with each header you include: `#include \"util.h\"` adds `util.cpp` (or `.cc`, `.cxx`) from the header's folder if it exists, and so on through the files that includes."
+        },
+        "cppRunButton.extraSources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Extra source files to compile along with the open file, as full paths or paths relative to the open file's folder. Use this for sources that `cppRunButton.followIncludes` doesn't find."
         }
       }
     }

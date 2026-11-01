@@ -155,6 +155,77 @@ const tests = {
     }
   },
 
+  async 'compiles the .cpp files that go with included headers'() {
+    write(path.join('multi', 'util.h'), 'int twice(int);\n');
+    write(path.join('multi', 'util.cpp'), '#include "util.h"\nint twice(int x) { return x * 2; }\n');
+    const file = write(path.join('multi', 'main.cpp'), '#include "util.h"\nint main() { return twice(5); }\n');
+    await open(file);
+    assert.deepStrictEqual(await runButton(), { built: true, exitCode: 10 });
+  },
+
+  async 'follows includes through several headers'() {
+    write(path.join('chain', 'a.h'), '#include "b.h"\nint a();\n');
+    write(path.join('chain', 'a.cpp'), '#include "a.h"\nint a() { return b() + 1; }\n');
+    write(path.join('chain', 'b.h'), 'int b();\n');
+    write(path.join('chain', 'b.cpp'), '#include "b.h"\nint b() { return 11; }\n');
+    const file = write(path.join('chain', 'main.cpp'), '#include "a.h"\nint main() { return a(); }\n');
+    await open(file);
+    assert.deepStrictEqual(await runButton(), { built: true, exitCode: 12 });
+  },
+
+  async 'does not add sources when followIncludes is off'() {
+    const config = vscode.workspace.getConfiguration('cppRunButton');
+    await config.update('followIncludes', false, vscode.ConfigurationTarget.Global);
+    try {
+      write(path.join('off', 'util.h'), 'int twice(int);\n');
+      write(path.join('off', 'util.cpp'), '#include "util.h"\nint twice(int x) { return x * 2; }\n');
+      const file = write(path.join('off', 'main.cpp'), '#include "util.h"\nint main() { return twice(5); }\n');
+      await open(file);
+      assert.strictEqual((await runButton()).built, false, 'linking fails without util.cpp');
+    } finally {
+      await config.update('followIncludes', undefined, vscode.ConfigurationTarget.Global);
+    }
+  },
+
+  async 'compiles the files listed in extraSources'() {
+    write(path.join('extra', 'helpers.cpp'), 'int seven() { return 7; }\n');
+    const file = write(path.join('extra', 'main.cpp'), 'int seven();\nint main() { return seven(); }\n');
+    const config = vscode.workspace.getConfiguration('cppRunButton');
+    await config.update('extraSources', ['helpers.cpp'], vscode.ConfigurationTarget.Global);
+    try {
+      await open(file);
+      assert.deepStrictEqual(await runButton(), { built: true, exitCode: 7 });
+    } finally {
+      await config.update('extraSources', undefined, vscode.ConfigurationTarget.Global);
+    }
+  },
+
+  async 'leaves out a source that a header #includes itself'() {
+    // Templates are often written as stack.h ending in #include "stack.cpp".
+    write(path.join('tmpl', 'stack.h'), [
+      '#pragma once',
+      'template <class T> T top(T x);',
+      '#include "stack.cpp"',
+      '',
+    ].join('\n'));
+    write(path.join('tmpl', 'stack.cpp'), 'int helper() { return 13; }\ntemplate <class T> T top(T x) { return x + helper(); }\n');
+    const file = write(path.join('tmpl', 'main.cpp'), '#include "stack.h"\nint main() { return top(0); }\n');
+    await open(file);
+    assert.deepStrictEqual(await runButton(), { built: true, exitCode: 13 });
+  },
+
+  async 'saves unsaved edits in included headers'() {
+    const header = write(path.join('dirty', 'value.h'), 'inline int value() { return 1; }\n');
+    const file = write(path.join('dirty', 'main.cpp'), '#include "value.h"\nint main() { return value(); }\n');
+    const document = await open(header);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(document.uri, document.lineAt(0).range, 'inline int value() { return 14; }');
+    await vscode.workspace.applyEdit(edit);
+    await open(file);
+    assert.deepStrictEqual(await runButton(), { built: true, exitCode: 14 });
+    assert.ok(!document.isDirty);
+  },
+
   async 'reports a compiler that cannot be started'() {
     const config = vscode.workspace.getConfiguration('cppRunButton');
     await config.update('compiler', 'no-such-compiler-xyz', vscode.ConfigurationTarget.Global);

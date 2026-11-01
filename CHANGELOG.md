@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Programs split over several files now build: the `.cpp` file that goes with each `#include "x.h"` is compiled
+  and linked too (`cppRunButton.followIncludes`, on by default).
+- `cppRunButton.extraSources` setting for source files that aren't found that way.
+
 ## 0.3.0
 
 - `cppRunButton.clearTerminal` setting: set it to `false` to keep the output of earlier runs in the terminal
