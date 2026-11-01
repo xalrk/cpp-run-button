@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
-- Programs split over several files now build: the `.cpp` file that goes with each `#include "x.h"` is compiled
-  and linked too (`cppRunButton.followIncludes`, on by default).
-- `cppRunButton.extraSources` setting for source files that aren't found that way.
+- Programs split over several files now build: for each `#include "x.h"`, the matching `x.cpp` (or `.cc`, `.cxx`)
+  next to the header is compiled and linked too, following includes through those files as well. On by default;
+  set `cppRunButton.followIncludes` to `false` to compile only the open file.
+- New `cppRunButton.extraSources` setting for source files that aren't found that way.
+- Unsaved edits in the included headers and sources are saved before the build, as the open file already was.
 
 ## 0.3.0
 

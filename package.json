@@ -2,7 +2,7 @@
   "name": "cpp-run-button",
   "displayName": "C++ Run Button",
   "description": "A ▶ button in the editor title bar that compiles the open C++ file with g++ and runs it.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "xalrk",
   "icon": "images/icon.png",
   "license": "MIT",
