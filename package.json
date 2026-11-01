@@ -110,7 +110,7 @@
         "cppRunButton.followIncludes": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Also compile the `.cpp` file that goes with each header you include: `#include \"util.h\"` adds `util.cpp` from the same folder if it exists."
+          "markdownDescription": "Also compile the `.cpp` file that goes with each header you include: `#include \"util.h\"` adds `util.cpp` (or `.cc`, `.cxx`) from the header's folder if it exists, and so on through the files that includes."
         },
         "cppRunButton.extraSources": {
           "type": "array",

@@ -20,7 +20,7 @@ function activate(context) {
   return { cpptools };
 }
 
-function deactivate() { }
+function deactivate() {}
 
 // Counts clicks, so an older click that is still building can tell that a
 // newer one has taken over and must not start its program.
@@ -43,7 +43,7 @@ async function buildAndRun(uri) {
     return { built: false };
   }
   // Not awaited: the build goes ahead while the question is showing.
-  cpptools.offerToHideRunButton(extensionContext, document.uri).catch(() => { });
+  cpptools.offerToHideRunButton(extensionContext, document.uri).catch(() => {});
 
   const file = document.uri.fsPath;
   const dir = path.dirname(file);
@@ -55,12 +55,16 @@ async function buildAndRun(uri) {
   if (!compiler) {
     return { built: false };
   }
-  // Other .cpp files the program needs: the sources that go with the headers
+  // Other source files the program needs: the ones that go with the headers
   // it includes, plus any the user listed.
+  const found = config.get('followIncludes', true)
+    ? findIncludedSources(file)
+    : { sources: [], visited: [] };
   const extra = config.get('extraSources', []).map((p) => path.resolve(dir, p));
-  const siblings = config.get('followIncludes', true) ? findSiblingSources(file) : [];
-  const sources = [...new Set([...siblings, ...extra])].filter((s) => s !== file);
-  await saveDirtySources(sources);
+  const sources = [...new Set([...found.sources, ...extra])].filter((s) => !samePath(s, file));
+  if (!(await saveDirty([...found.visited, ...sources]))) {
+    return { built: false };
+  }
   const args = [...config.get('compilerArgs', []), file, ...sources, '-o', exe];
   const scope = vscode.workspace.getWorkspaceFolder(document.uri) || vscode.TaskScope.Workspace;
 
@@ -124,7 +128,7 @@ function findCompiler(config, uri) {
     if (findExecutable(chosen)) return chosen;
     vscode.window.showErrorMessage(
       `Couldn't find the compiler "${chosen}" set in "cppRunButton.compiler". ` +
-      'Check that it is installed, and use its full path if it is not on your PATH.'
+        'Check that it is installed, and use its full path if it is not on your PATH.'
     );
     return undefined;
   }
@@ -135,57 +139,78 @@ function findCompiler(config, uri) {
 
   vscode.window.showErrorMessage(
     'Couldn\'t find g++. Install it and make sure it is on your PATH, ' +
-    'or set "cppRunButton.compiler" to the full path of your compiler.'
+      'or set "cppRunButton.compiler" to the full path of your compiler.'
   );
   return undefined;
 }
 
-// The .cpp files that go with the headers a source file includes. For each
-// #include "foo.h" (looked up from the including file's folder), a sibling
-// foo.cpp, foo.cc or foo.cxx is added to the build, and the search continues
-// through that file's includes, so main -> a.h -> b.h is followed all the way.
-// A header with no matching source adds nothing.
-function findSiblingSources(file) {
+const SOURCE_EXTENSIONS = ['.cpp', '.cc', '.cxx'];
+
+// The source files that go with the headers a file includes. For each
+// #include "foo.h" (looked up from the including file's folder), foo.cpp,
+// foo.cc or foo.cxx next to the header is added to the build, and the search
+// continues through that header and source, so main -> a.h -> b.h is followed
+// all the way. A file that is itself #included somewhere (the
+// `#include "stack.cpp"` pattern for templates) is left out, since compiling it
+// again on its own would define everything twice.
+//
+// Returns { sources, visited }: visited is every file read on the way, so
+// their unsaved edits can be saved before the build.
+function findIncludedSources(file) {
   const seen = new Set([file]);
+  const included = new Set();
   const sources = [];
   const queue = [file];
+  const visit = (p) => {
+    if (seen.has(p) || !fs.existsSync(p)) return false;
+    seen.add(p);
+    queue.push(p);
+    return true;
+  };
   while (queue.length) {
     const current = queue.pop();
-    let text;
-    try {
-      text = fs.readFileSync(current, 'utf8');
-    } catch {
-      continue;
-    }
+    const text = readCurrent(current);
+    if (text === undefined) continue;
     for (const match of text.matchAll(/^\s*#\s*include\s*"([^"]+)"/gm)) {
       const header = path.resolve(path.dirname(current), match[1]);
+      included.add(header);
+      visit(header); // headers can include other headers
       const base = header.replace(/\.(h|hpp|hh|hxx)$/i, '');
-      for (const ext of ['.cpp', '.cc', '.cxx']) {
-        const source = base + ext;
-        if (!seen.has(source) && fs.existsSync(source)) {
-          seen.add(source);
-          sources.push(source);
-          queue.push(source);
-        }
-      }
-      if (!seen.has(header) && fs.existsSync(header)) {
-        seen.add(header);
-        queue.push(header); // headers can include other headers
-      }
+      if (base === header) continue; // not a header, e.g. #include "impl.cpp"
+      // Only the first match, so foo.cpp and a stray foo.cc aren't both linked.
+      const source = SOURCE_EXTENSIONS.map((ext) => base + ext).find((s) => fs.existsSync(s));
+      if (source && visit(source)) sources.push(source);
     }
   }
-  return sources;
+  return { sources: sources.filter((s) => !included.has(s)), visited: [...seen] };
 }
 
-// Saves unsaved edits in the extra files about to be compiled, so the build
-// doesn't use stale copies. Only those files, not everything that's open.
-async function saveDirtySources(sources) {
-  const wanted = new Set(sources.map((s) => path.normalize(s)));
+// A file's text as the editor has it, so includes added but not yet saved
+// count too, or else as it is on disk.
+function readCurrent(file) {
+  const open = vscode.workspace.textDocuments.find((d) => d.uri.scheme === 'file' && samePath(d.uri.fsPath, file));
+  if (open) return open.getText();
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+function samePath(a, b) {
+  const norm = (p) => (process.platform === 'win32' ? path.normalize(p).toLowerCase() : path.normalize(p));
+  return norm(a) === norm(b);
+}
+
+// Saves unsaved edits in these files, so the build doesn't compile stale
+// copies. Only these, not everything that is open. False if a save failed.
+async function saveDirty(files) {
   for (const doc of vscode.workspace.textDocuments) {
-    if (doc.isDirty && wanted.has(path.normalize(doc.uri.fsPath))) {
-      await doc.save();
+    if (doc.isDirty && doc.uri.scheme === 'file' && files.some((f) => samePath(f, doc.uri.fsPath))) {
+      if (!(await doc.save())) return false;
     }
   }
+  return true;
 }
 
 async function findDocument(uri) {
